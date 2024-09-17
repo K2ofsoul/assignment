@@ -82,8 +82,50 @@ if (isset($_POST['add_message'])) {
         echo "<div class='alert alert-danger'>Message cannot be empty</div>";
     }
 }
+if (isset($_POST['delete_message'])) {
+    $message_id = $_POST['message_id'];
+    
+    $sql_files = "SELECT file_path FROM files WHERE message_id = ?";
+    $stmt_files = $conn->prepare($sql_files);
+    $stmt_files->bind_param('i', $message_id);
+    $stmt_files->execute();
+    $result_files = $stmt_files->get_result();
+    
+    while ($file = $result_files->fetch_assoc()) {
+        unlink($file['file_path']); 
+    }
+    $sql_delete_files = "DELETE FROM files WHERE message_id = ?";
+    $stmt_delete_files = $conn->prepare($sql_delete_files);
+    $stmt_delete_files->bind_param('i', $message_id);
+    $stmt_delete_files->execute();
 
-// Fetch all messages and their attached files
+    $sql = "DELETE FROM messages WHERE id = ? AND user_id = ?";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param('ii', $message_id, $user_id);
+    $stmt->execute();
+    
+    header("Location: index.php");
+    exit();
+}
+if (isset($_POST['edit_message'])) {
+    $message_id = $_POST['message_id'];
+    $new_message = trim($_POST['new_message']);
+    
+    if (!empty($new_message)) {
+        $sql = "UPDATE messages SET message = ? WHERE id = ? AND user_id = ?";
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param('sii', $new_message, $message_id, $user_id);
+        $stmt->execute();
+
+        if (!empty($_FILES['files']['name'][0])) {
+            uploadFiles($message_id, $conn);
+        }
+        header("Location: index.php");
+        exit();
+    } else {
+        echo "<div class='alert alert-danger'>Message cannot be empty</div>";
+    }
+}
 $sql_messages = "SELECT messages.id, messages.message, messages.created_at, users.email 
                  FROM messages 
                  JOIN users ON messages.user_id = users.id 
@@ -124,16 +166,14 @@ $result_messages = $conn->query($sql_messages);
                     </ul>
                 <?php endif; ?>
 
-                <!-- Edit/Delete buttons for the message owner -->
                 <?php if ($message['email'] === $_SESSION['user']): ?>
                     <form action="index.php" method="post" enctype="multipart/form-data" style="display:inline;">
-                        <input type="hidden" name="message_id" value="<?= $message['id'] ?>">
-                        <input type="text" name="new_message" value="<?= $message['message'] ?>" required>
-                        <input type="file" name="files[]" multiple>
-                        <button type="submit" name="edit_message" class="btn btn-primary btn-sm">Edit</button>
-                    </form>
+                    <input type="hidden" name="message_id" value="<?= $message['id'] ?>">
+                    <input type="text" name="new_message" value="<?= $message['message'] ?>" required>
+                    <input type="file" name="files[]" multiple>
+                    <button type="submit" name="edit_message" class="btn btn-primary btn-sm">Edit</button>
+</form>
 
-                    <!-- Delete form -->
                     <form action="index.php" method="post" style="display:inline;">
                         <input type="hidden" name="message_id" value="<?= $message['id'] ?>">
                         <button type="submit" name="delete_message" class="btn btn-danger btn-sm">Delete</button>
@@ -143,7 +183,6 @@ $result_messages = $conn->query($sql_messages);
             <hr>
         <?php endwhile; ?>
 
-        <!-- Add new message form -->
         <h2>Add a New Message</h2>
         <form action="index.php" method="post" enctype="multipart/form-data">
             <textarea name="message" class="form-control" placeholder="Write your message here..." required></textarea>
