@@ -19,15 +19,12 @@ if (isset($_SESSION['login_time'])) {
 
 require_once "database.php";
 
-// Fetch user details
 $user_id = $_SESSION['user_id'];
 
-// File upload logic with error handling
 function uploadFiles($message_id, $conn) {
     $allowed_types = ['pdf', 'doc', 'docx', 'jpg'];
     $upload_dir = 'uploads/';
 
-    // Check if the upload directory exists
     if (!is_dir($upload_dir)) {
         echo "<div class='alert alert-danger'>Upload directory does not exist. Please create a folder named 'uploads' and give it the right permissions.</div>";
         return;
@@ -39,30 +36,23 @@ function uploadFiles($message_id, $conn) {
         $file_error = $_FILES['files']['error'][$key];
         $file_size = $_FILES['files']['size'][$key];
 
-        // Check for any upload errors
         if ($file_error !== UPLOAD_ERR_OK) {
             echo "<div class='alert alert-danger'>Error uploading file: $file_name. Error code: $file_error</div>";
             continue;
         }
 
-        // Check if the file type is allowed
         if (!in_array($file_ext, $allowed_types)) {
             echo "<div class='alert alert-danger'>Invalid file type: $file_name</div>";
             continue;
         }
-
-        // Check file size limit (e.g., 2MB)
         if ($file_size > 2 * 1024 * 1024) {
             echo "<div class='alert alert-danger'>File too large: $file_name</div>";
             continue;
         }
-
-        // Generate new file name and move the uploaded file
         $file_new_name = time() . '_' . $file_name;
         $file_path = $upload_dir . $file_new_name;
 
         if (move_uploaded_file($file_tmp, $file_path)) {
-            // Insert file info into the database
             $sql = "INSERT INTO files (message_id, file_name, file_path) VALUES (?, ?, ?)";
             $stmt = $conn->prepare($sql);
             $stmt->bind_param('iss', $message_id, $file_new_name, $file_path);
@@ -83,7 +73,7 @@ if (isset($_POST['add_message'])) {
         if ($stmt->execute()) {
             $message_id = $conn->insert_id;
             if (!empty($_FILES['files']['name'][0])) {
-                uploadFiles($message_id, $conn);  // Handle file uploads
+                uploadFiles($message_id, $conn); 
             }
             header("Location: index.php");
             exit();
@@ -112,18 +102,13 @@ $result_messages = $conn->query($sql_messages);
     <div class="container">
         <h1>Welcome</h1>
         <a href="logout.php" class="btn btn-warning">Logout</a>
-
-        <!-- Message Board Section -->
         <hr>
         <h2>Messages</h2>
 
-        <!-- Display all messages -->
         <?php while ($message = $result_messages->fetch_assoc()): ?>
             <div class="message-box mb-4">
                 <p><strong><?= $message['email'] ?>:</strong> <?= $message['message'] ?></p>
                 <small>Posted on: <?= $message['created_at'] ?></small>
-
-                <!-- Display files for the message -->
                 <?php
                 $message_id = $message['id'];
                 $sql_files = "SELECT * FROM files WHERE message_id = ?";
@@ -141,7 +126,6 @@ $result_messages = $conn->query($sql_messages);
 
                 <!-- Edit/Delete buttons for the message owner -->
                 <?php if ($message['email'] === $_SESSION['user']): ?>
-                    <!-- Edit form -->
                     <form action="index.php" method="post" enctype="multipart/form-data" style="display:inline;">
                         <input type="hidden" name="message_id" value="<?= $message['id'] ?>">
                         <input type="text" name="new_message" value="<?= $message['message'] ?>" required>
